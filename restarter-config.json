@@ -1,0 +1,9 @@
+{
+  "webhook": {
+    "enabled": false,
+    "url": ""
+  },
+  "minutes": 6,
+  "webhookMsg": "",
+  "sendMsg": false
+}

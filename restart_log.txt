@@ -1,0 +1,4 @@
+2024-05-23 21:11:46 - INFO - Your bot has been rebooted after: Command '['python', 'main.py']' timed out after 360 seconds
+2024-05-23 21:17:54 - INFO - Your bot has been rebooted after: Command '['python', 'main.py']' timed out after 360 seconds
+2024-05-23 21:24:02 - INFO - Your bot has been rebooted after: Command '['python', 'main.py']' timed out after 360 seconds
+2024-05-23 21:30:10 - INFO - Your bot has been rebooted after: Command '['python', 'main.py']' timed out after 360 seconds

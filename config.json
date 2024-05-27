@@ -1,0 +1,9 @@
+{
+    "input_dir": "",
+    "results_dir": "",
+    "thread_count": 400,
+    "proxies_file": "proxies.txt",
+    "combos_file": "accounts.txt",
+    "hit_webhook": "https://discord.com/api/webhooks/1244667210644066304/W-4xQX0OQiO0G4uUpKCSLbDeUv55VPk9ohj9m7nu-D0hxmSx0IquARgiF-tJbXx3mz4D",
+    "user_id": "506769994630168587"
+}
