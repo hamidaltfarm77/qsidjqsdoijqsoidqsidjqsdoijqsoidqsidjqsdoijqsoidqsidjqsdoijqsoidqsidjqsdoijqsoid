@@ -52,9 +52,9 @@ def cleanup_logs(log_file):
 while True:
     cleanup_logs(log_file)
 
-    process = subprocess.Popen(['python', 'shuffle.py'])
+    process = subprocess.Popen(['python3', 'shuffle.py'])
     time.sleep(8)
-    process = subprocess.Popen(['python', 'main.py'])
+    process = subprocess.Popen(['python3', 'main.py'])
 
     current_time = datetime.now(kiev_timezone).strftime("%Y-%m-%d %H:%M:%S")
 
