@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-webhookURL = "https://discord.com/api/webhooks/1244667210644066304/W-4xQX0OQiO0G4uUpKCSLbDeUv55VPk9ohj9m7nu-D0hxmSx0IquARgiF-tJbXx3mz4D"
+webhookURL = "https://discord.com/api/webhooks/1249734897229103105/bjYpjE_6iLCt76U4iy0TDWaW8KaKScG3sg1tA137tzNA4enh-AxMSIr9RQZW5WIPgNmk"
 
 def load_config():
     with open("config.json") as f:
